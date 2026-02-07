@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Spinner } from '@/components/ui/spinner';
 
 // Lazy load the views
@@ -14,17 +15,43 @@ const PageLoader = () => (
   </div>
 );
 
+const routeVariants = {
+  initial: { opacity: 0, x: 24 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+};
+
+function AnimatedRoutes() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        className="h-full w-full"
+        variants={routeVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ duration: 0.25, ease: "easeOut" }}
+      >
+        <Routes location={location}>
+          <Route path="/" element={<MapView />} />
+          <Route path="/search" element={<SearchView />} />
+          <Route path="/profile" element={<SettingsView />} />
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       {/* We use d-vh (dynamic viewport height) for mobile browser support */}
       <div className="h-[100dvh] w-screen overflow-hidden bg-background">
         <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<MapView />} />
-            <Route path="/search" element={<SearchView />} />
-            <Route path="/profile" element={<SettingsView />} />
-          </Routes>
+          <AnimatedRoutes />
         </Suspense>
       </div>
     </BrowserRouter>
