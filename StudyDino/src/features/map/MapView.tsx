@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronUp, Search, User } from 'lucide-react';
+import { ChevronDown, ChevronUp, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
