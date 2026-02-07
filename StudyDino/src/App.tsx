@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/spinner';
 // Lazy load the views
 const MapView = lazy(() => import('@/features/map/MapView'));
 const SearchView = lazy(() => import('@/features/search/SearchView'));
-const SettingsView = lazy(() => import('@/features/settings/SettingsView'));
+const SettingsView = lazy(() => import('@/features/profile/ProfileView'));
 
 // A simple full-screen loader
 const PageLoader = () => (
@@ -23,7 +23,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<MapView />} />
             <Route path="/search" element={<SearchView />} />
-            <Route path="/settings" element={<SettingsView />} />
+            <Route path="/profile" element={<SettingsView />} />
           </Routes>
         </Suspense>
       </div>

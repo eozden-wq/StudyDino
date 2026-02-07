@@ -54,7 +54,7 @@ export default function MapView() {
             </div>
 
             <div className="absolute top-4 right-4 z-10">
-                <Link to="/settings">
+                <Link to="/profile">
                     <Button variant="secondary" size="icon" className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0">
                         <User className="h-5 w-5" />
                     </Button>
