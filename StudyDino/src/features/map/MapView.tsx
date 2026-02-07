@@ -5,6 +5,8 @@ import { Search, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
+// import dinoPng from '@/assets/dinosaur.png'
+import { DinoChat } from '@/components/DinoChat';
 
 export default function MapView() {
     const { center, zoom, setMapState } = useMapStore();
@@ -73,6 +75,10 @@ export default function MapView() {
                         <User className="h-5 w-5" />
                     </Button>
                 </Link>
+            </div>
+
+            <div className="absolute bottom-4 right-4 z-10">
+                <DinoChat />
             </div>
         </div>
     );
