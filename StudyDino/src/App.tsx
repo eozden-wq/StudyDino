@@ -5,7 +5,6 @@ import { Spinner } from '@/components/ui/spinner';
 
 // Lazy load the views
 const MapView = lazy(() => import('@/features/map/MapView'));
-const SearchView = lazy(() => import('@/features/search/SearchView'));
 const SettingsView = lazy(() => import('@/features/profile/ProfileView'));
 
 // A simple full-screen loader
@@ -37,7 +36,6 @@ function AnimatedRoutes() {
       >
         <Routes location={location}>
           <Route path="/" element={<MapView />} />
-          <Route path="/search" element={<SearchView />} />
           <Route path="/profile" element={<SettingsView />} />
         </Routes>
       </motion.div>
