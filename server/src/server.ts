@@ -15,7 +15,13 @@ const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE;
 
 // Middleware
-app.use(cors());
+app.use(
+    cors({
+        origin: true,
+        credentials: true,
+        allowedHeaders: ["Authorization", "Content-Type"],
+    })
+);
 app.use(express.json());
 
 if (!AUTH0_DOMAIN || !AUTH0_AUDIENCE) {

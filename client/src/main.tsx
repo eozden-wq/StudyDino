@@ -24,16 +24,34 @@ const applyInitialTheme = () => {
 
 applyInitialTheme()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Auth0Provider
-      domain="dev-3s241877k6ba3txd.us.auth0.com"
-      clientId="yO5ENS7oTRD4e6ciHKThACZFFAxB6duh"
-      authorizationParams={{
-        redirect_uri: window.location.origin
-      }}
-    >
-      <App />
-    </Auth0Provider>
-  </StrictMode>,
-)
+const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN
+const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID
+const auth0Audience = import.meta.env.VITE_AUTH0_AUDIENCE
+const auth0RedirectUri = import.meta.env.VITE_AUTH0_REDIRECT_URI
+
+const root = createRoot(document.getElementById('root')!)
+
+if (!auth0Domain || !auth0ClientId) {
+  root.render(
+    <StrictMode>
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-background text-foreground">
+        Missing Auth0 configuration.
+      </div>
+    </StrictMode>
+  )
+} else {
+  root.render(
+    <StrictMode>
+      <Auth0Provider
+        domain={auth0Domain}
+        clientId={auth0ClientId}
+        authorizationParams={{
+          redirect_uri: auth0RedirectUri ?? window.location.origin,
+          audience: auth0Audience,
+        }}
+      >
+        <App />
+      </Auth0Provider>
+    </StrictMode>
+  )
+}

@@ -30,38 +30,44 @@ router.get("/me", async (req: AuthRequest, res: Response) => {
 })
 
 router.patch("/me", async (req: AuthRequest, res: Response) => {
-    const auth0Id = getAuth0Id(req)
-    if (!auth0Id) {
-        return res.status(401).json({ error: "Unauthorized" })
+    try {
+        const auth0Id = getAuth0Id(req)
+        if (!auth0Id) {
+            return res.status(401).json({ error: "Unauthorized" })
+        }
+
+        const payload = req.body as Partial<{
+            firstName: string
+            lastName: string
+            university: string
+            course: string
+            year: number
+        }>
+
+        const update: Record<string, unknown> = {}
+
+        if (typeof payload.firstName === "string") update.firstName = payload.firstName
+        if (typeof payload.lastName === "string") update.lastName = payload.lastName
+        if (typeof payload.university === "string") update.university = payload.university
+        if (typeof payload.course === "string") update.course = payload.course
+        if (typeof payload.year === "number" && !Number.isNaN(payload.year)) {
+            update.year = payload.year
+        }
+
+        if (Object.keys(update).length === 0) {
+            return res.status(400).json({ error: "No valid fields provided" })
+        }
+
+        const user = await UserModel.findOneAndUpdate(
+            { auth0Id },
+            { $set: update },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        ).lean()
+
+        return res.json({ data: user })
+    } catch (err) {
+        return res.status(500).json({ error: "Failed to save profile" })
     }
-
-    const payload = req.body as Partial<{
-        firstName: string
-        lastName: string
-        university: string
-        course: string
-        year: number
-    }>
-
-    const update: Record<string, unknown> = {}
-
-    if (typeof payload.firstName === "string") update.firstName = payload.firstName
-    if (typeof payload.lastName === "string") update.lastName = payload.lastName
-    if (typeof payload.university === "string") update.university = payload.university
-    if (typeof payload.course === "string") update.course = payload.course
-    if (typeof payload.year === "number") update.year = payload.year
-
-    if (Object.keys(update).length === 0) {
-        return res.status(400).json({ error: "No valid fields provided" })
-    }
-
-    const user = await UserModel.findOneAndUpdate(
-        { auth0Id },
-        { $set: update },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-    ).lean()
-
-    return res.json({ data: user })
 })
 
 export default router
