@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { Map, MapControls } from '@/components/ui/map'; // Your mapcn import
 import { Button } from '@/components/ui/button';
-import { Search, Settings } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
@@ -47,7 +47,7 @@ export default function MapView() {
 
             <div className="absolute top-4 left-4 z-10">
                 <Link to="/search">
-                    <Button variant="secondary" size="icon" className="rounded-full shadow-lg border border-white/20 backdrop-blur-md">
+                    <Button variant="secondary" size="icon" className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0">
                         <Search className="h-5 w-5" />
                     </Button>
                 </Link>
@@ -55,8 +55,8 @@ export default function MapView() {
 
             <div className="absolute top-4 right-4 z-10">
                 <Link to="/settings">
-                    <Button variant="secondary" size="icon" className="rounded-full shadow-lg border border-white/20 backdrop-blur-md">
-                        <Settings className="h-5 w-5" />
+                    <Button variant="secondary" size="icon" className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0">
+                        <User className="h-5 w-5" />
                     </Button>
                 </Link>
             </div>
