@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Map, MapControls } from '@/components/ui/map'; // Your mapcn import
 import { Button } from '@/components/ui/button';
 import { Search, User } from 'lucide-react';
@@ -9,6 +9,22 @@ import type { Map as MapLibreInstance } from 'maplibre-gl';
 export default function MapView() {
     const { center, zoom, setMapState } = useMapStore();
     const mapRef = useRef<MapLibreInstance | null>(null);
+    const [isMapReady, setIsMapReady] = useState(false);
+
+    // Handler for when the map ref is set
+    const handleMapRef = useCallback((map: MapLibreInstance | null) => {
+        mapRef.current = map;
+        if (map) {
+            // Wait for the map to be loaded before marking it as ready
+            if (map.loaded()) {
+                setIsMapReady(true);
+            } else {
+                map.on('load', () => setIsMapReady(true));
+            }
+        } else {
+            setIsMapReady(false);
+        }
+    }, []);
 
     // We attach this callback to the map's "moveend" event
     // to save state only when the user stops dragging.
@@ -20,25 +36,23 @@ export default function MapView() {
         setMapState([lng, lat], map.getZoom());
     }, [setMapState]);
 
+    // Attach the moveend listener when the map is ready
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || !isMapReady) return;
 
         map.on('moveend', handleMoveEnd);
 
         return () => {
             map.off('moveend', handleMoveEnd);
         };
-    }, [handleMoveEnd]);
+    }, [handleMoveEnd, isMapReady]);
 
     return (
         <div className="relative h-full w-full">
             <Map
-                ref={mapRef}
-                center={[
-                    center[0],
-                    center[1],
-                ]}
+                ref={handleMapRef}
+                center={[center[0], center[1]]}
                 zoom={zoom}
                 className="h-full w-full"
             >

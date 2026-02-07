@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface MapState {
     // MapLibre uses [Lng, Lat]
@@ -18,6 +18,8 @@ export const useMapStore = create<MapState>()(
         }),
         {
             name: 'map-storage',
+            storage: createJSONStorage(() => localStorage),
+            version: 1,
         }
     )
 );
