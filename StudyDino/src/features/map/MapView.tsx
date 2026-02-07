@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronUp, User } from 'lucide-react';
+import { ChevronDown, ChevronUp, User, Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
@@ -228,6 +228,14 @@ export default function MapView() {
 
             <div className="absolute bottom-4 right-4 z-10">
                 <DinoChat />
+            </div>
+
+            <div className="absolute bottom-4 left-4 z-10">
+                <Link to="/add">
+                    <Button variant="secondary" size="icon" className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0">
+                        <Plus className="h-5 w-5" />
+                    </Button>
+                </Link>
             </div>
 
             <Card className="absolute top-4 left-4 z-10 w-[min(92vw,380px)] max-h-[70vh] overflow-hidden">
