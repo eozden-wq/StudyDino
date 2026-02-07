@@ -26,7 +26,7 @@ export function DinoChat() {
     { 
       id: '1', 
       role: 'model', 
-      text: "ROAR! 🦖 I am DinoBot. I can help you find fossils or identify dinosaurs on the map. What's on your mind?", 
+      text: "ROAR! 🦖 I am DinoBot. I can help you find groups who share your interests!", 
       timestamp: new Date() 
     },
   ]);
@@ -149,7 +149,7 @@ export function DinoChat() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about dinosaurs..."
+              placeholder="Ask about your interests"
               className="flex-1 pr-10 rounded-full border-gray-300 dark:border-gray-700 focus-visible:ring-offset-0"
               disabled={isLoading}
             />
