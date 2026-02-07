@@ -1,0 +1,65 @@
+import { useRef, useCallback, useEffect } from 'react';
+import { Map, MapControls } from '@/components/ui/map'; // Your mapcn import
+import { Button } from '@/components/ui/button';
+import { Search, Settings } from 'lucide-react';
+import { Link } from 'react-router';
+import { useMapStore } from '@/store/map-store';
+import type { Map as MapLibreInstance } from 'maplibre-gl';
+
+export default function MapView() {
+    const { center, zoom, setMapState } = useMapStore();
+    const mapRef = useRef<MapLibreInstance | null>(null);
+
+    // We attach this callback to the map's "moveend" event
+    // to save state only when the user stops dragging.
+    const handleMoveEnd = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const { lng, lat } = map.getCenter();
+        setMapState([lng, lat], map.getZoom());
+    }, [setMapState]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        map.on('moveend', handleMoveEnd);
+
+        return () => {
+            map.off('moveend', handleMoveEnd);
+        };
+    }, [handleMoveEnd]);
+
+    return (
+        <div className="relative h-full w-full">
+            <Map
+                ref={mapRef}
+                center={[
+                    center[0],
+                    center[1],
+                ]}
+                zoom={zoom}
+                className="h-full w-full"
+            >
+                <MapControls position="bottom-right" showZoom={false} showCompass={false} />
+            </Map>
+
+            <div className="absolute top-4 left-4 z-10">
+                <Link to="/search">
+                    <Button variant="secondary" size="icon" className="rounded-full shadow-lg border border-white/20 backdrop-blur-md">
+                        <Search className="h-5 w-5" />
+                    </Button>
+                </Link>
+            </div>
+
+            <div className="absolute top-4 right-4 z-10">
+                <Link to="/settings">
+                    <Button variant="secondary" size="icon" className="rounded-full shadow-lg border border-white/20 backdrop-blur-md">
+                        <Settings className="h-5 w-5" />
+                    </Button>
+                </Link>
+            </div>
+        </div>
+    );
+}
