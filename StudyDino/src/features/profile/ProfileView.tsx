@@ -251,7 +251,7 @@ export default function ProfileView() {
                     </Button>
                 </div>
             </div>
-            <div className="absolute bottom-4 left-4 z-10">
+            <div className="absolute top-4 right-4 z-10">
                 <Button
                     type="button"
                     variant="secondary"
