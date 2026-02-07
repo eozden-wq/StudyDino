@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth0 } from "@auth0/auth0-react"
+import { apiRequest, ApiError } from "@/lib/api"
 
 const INTEREST_OPTIONS = [
     "Productivity",
@@ -22,9 +23,17 @@ type ThemeMode = "light" | "dark"
 
 const THEME_STORAGE_KEY = "client-theme"
 
-const INSTITUTION_NAME = "Durham University"
-const COURSE_NAME = "BSc Computer Science"
 const YEAR_OF_STUDY_OPTIONS = ["1", "2", "3", "4"]
+
+type MeResponse = {
+    data: {
+        firstName?: string
+        lastName?: string
+        university?: string
+        course?: string
+        year?: number
+    }
+}
 
 const getInitialTheme = (): ThemeMode => {
     if (typeof document === "undefined" || typeof window === "undefined") {
@@ -46,7 +55,7 @@ const getInitialTheme = (): ThemeMode => {
 }
 
 export default function ProfileView() {
-    const { user, logout } = useAuth0(); // Get user and logout from Auth0
+    const { user, logout, getAccessTokenSilently, isAuthenticated } = useAuth0();
     const auth0Logout = () => logout({ logoutParams: { returnTo: window.location.origin } });
 
     // Initial state for user details from Auth0, or empty strings if not available
@@ -58,6 +67,12 @@ export default function ProfileView() {
     )
     const [interests, setInterests] = useState<string[]>(["Design", "Reading"])
     const [yearOfStudy, setYearOfStudy] = useState("2")
+    const [university, setUniversity] = useState("")
+    const [course, setCourse] = useState("")
+    const [profileError, setProfileError] = useState<string | null>(null)
+    const [profileSaveError, setProfileSaveError] = useState<string | null>(null)
+    const [isSavingProfile, setIsSavingProfile] = useState(false)
+    const [isProfileLoading, setIsProfileLoading] = useState(false)
     const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme)
 
     const availableInterests = useMemo(
@@ -99,6 +114,101 @@ export default function ProfileView() {
         }
     }, [themeMode])
 
+    useEffect(() => {
+        if (!isAuthenticated) return
+        let isActive = true
+
+        const loadProfile = async () => {
+            setIsProfileLoading(true)
+            setProfileError(null)
+            try {
+                const response = await Promise.race([
+                    apiRequest<MeResponse>(
+                        "/me",
+                        { method: "GET" },
+                        () =>
+                            getAccessTokenSilently({
+                                authorizationParams: {
+                                    audience: import.meta.env.VITE_AUTH0_AUDIENCE
+                                }
+                            })
+                    ),
+                    new Promise<MeResponse>((_resolve, reject) =>
+                        setTimeout(() => reject(new Error("Profile request timed out.")), 8000)
+                    )
+                ])
+
+                if (!isActive) return
+
+                const data = response?.data
+                if (typeof data?.firstName === "string") setFirstName(data.firstName)
+                if (typeof data?.lastName === "string") setLastName(data.lastName)
+                if (typeof data?.university === "string") setUniversity(data.university)
+                if (typeof data?.course === "string") setCourse(data.course)
+                if (typeof data?.year === "number") setYearOfStudy(String(data.year))
+            } catch (err) {
+                if (!isActive) return
+                if (err instanceof ApiError && err.status === 404) {
+                    setProfileError(null)
+                } else if (err instanceof ApiError) {
+                    setProfileError(`Unable to load profile (${err.status}).`)
+                } else if (err instanceof Error) {
+                    setProfileError(err.message)
+                } else {
+                    setProfileError("Unable to load profile.")
+                }
+            } finally {
+                if (isActive) {
+                    setIsProfileLoading(false)
+                }
+            }
+        }
+
+        void loadProfile()
+
+        return () => {
+            isActive = false
+        }
+    }, [getAccessTokenSilently, isAuthenticated])
+
+    const saveProfile = async (payload: { year?: number }) => {
+        if (!isAuthenticated) return
+        setIsSavingProfile(true)
+        setProfileSaveError(null)
+        try {
+            await apiRequest<MeResponse>(
+                "/me",
+                {
+                    method: "PATCH",
+                    body: JSON.stringify(payload)
+                },
+                () =>
+                    getAccessTokenSilently({
+                        authorizationParams: {
+                            audience: import.meta.env.VITE_AUTH0_AUDIENCE
+                        }
+                    })
+            )
+        } catch (err) {
+            if (err instanceof ApiError) {
+                setProfileSaveError(`Unable to save profile (${err.status}).`)
+            } else {
+                setProfileSaveError("Unable to save profile.")
+            }
+        } finally {
+            setIsSavingProfile(false)
+        }
+    }
+
+    const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const nextYear = event.target.value
+        setYearOfStudy(nextYear)
+        const parsedYear = Number(nextYear)
+        if (!Number.isNaN(parsedYear)) {
+            void saveProfile({ year: parsedYear })
+        }
+    }
+
     return (
         <div className="relative min-h-screen bg-background px-5 pb-24 pt-16 text-foreground">
             <BackButton />
@@ -108,6 +218,16 @@ export default function ProfileView() {
                     <p className="text-sm text-muted-foreground">
                         View and update your personal details.
                     </p>
+                    {profileError && (
+                        <p className="text-xs text-destructive">
+                            {profileError}
+                        </p>
+                    )}
+                    {profileSaveError && (
+                        <p className="text-xs text-destructive">
+                            {profileSaveError}
+                        </p>
+                    )}
                 </header>
 
                 <section className="space-y-6">
@@ -153,7 +273,7 @@ export default function ProfileView() {
                         <Label htmlFor="institution-name">Institution</Label>
                         <Input
                             id="institution-name"
-                            value={INSTITUTION_NAME}
+                            value={isProfileLoading ? "Loading..." : university}
                             readOnly
                             className="cursor-default"
                         />
@@ -162,7 +282,7 @@ export default function ProfileView() {
                         <Label htmlFor="course-name">Course</Label>
                         <Input
                             id="course-name"
-                            value={COURSE_NAME}
+                            value={isProfileLoading ? "Loading..." : course}
                             readOnly
                             className="cursor-default"
                         />
@@ -172,7 +292,8 @@ export default function ProfileView() {
                         <select
                             id="year-of-study"
                             value={yearOfStudy}
-                            onChange={(event) => setYearOfStudy(event.target.value)}
+                            onChange={handleYearChange}
+                            disabled={isSavingProfile}
                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             {YEAR_OF_STUDY_OPTIONS.map((year) => (
