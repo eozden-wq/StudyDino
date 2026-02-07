@@ -9,7 +9,7 @@ interface MapState {
 
 export const useMapStore = create<MapState>((set) => ({
     // Default: London [Lng, Lat]
-    center: [-0.1276, 51.5072],
+    center: [- 1.57566, 54.77676],
     zoom: 12,
     setMapState: (center, zoom) => set({ center, zoom }),
 }));
