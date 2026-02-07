@@ -19,7 +19,7 @@ const INTEREST_OPTIONS = [
 
 type ThemeMode = "light" | "dark"
 
-const THEME_STORAGE_KEY = "studydino-theme"
+const THEME_STORAGE_KEY = "client-theme"
 
 const INSTITUTION_NAME = "Durham University"
 const COURSE_NAME = "BSc Computer Science"

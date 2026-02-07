@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-const THEME_STORAGE_KEY = 'studydino-theme'
+const THEME_STORAGE_KEY = 'client-theme'
 
 const applyInitialTheme = () => {
   if (typeof document === 'undefined' || typeof window === 'undefined') return
