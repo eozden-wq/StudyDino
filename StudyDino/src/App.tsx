@@ -49,7 +49,7 @@ export default function App() {
   return (
     <BrowserRouter>
       {/* We use d-vh (dynamic viewport height) for mobile browser support */}
-      <div className="h-[100dvh] w-screen overflow-hidden bg-background">
+      <div className="h-[100dvh] w-screen overflow-x-hidden bg-background">
         <Suspense fallback={<PageLoader />}>
           <AnimatedRoutes />
         </Suspense>

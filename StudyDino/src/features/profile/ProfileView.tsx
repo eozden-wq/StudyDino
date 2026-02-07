@@ -21,6 +21,10 @@ type ThemeMode = "light" | "dark"
 
 const THEME_STORAGE_KEY = "studydino-theme"
 
+const INSTITUTION_NAME = "Durham University"
+const COURSE_NAME = "BSc Computer Science"
+const YEAR_OF_STUDY_OPTIONS = ["1", "2", "3", "4"]
+
 const getInitialTheme = (): ThemeMode => {
     if (typeof document === "undefined" || typeof window === "undefined") {
         return "light"
@@ -48,6 +52,7 @@ export default function ProfileView() {
         INTEREST_OPTIONS[0]
     )
     const [interests, setInterests] = useState<string[]>(["Design", "Reading"])
+    const [yearOfStudy, setYearOfStudy] = useState("2")
     const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme)
 
     const availableInterests = useMemo(
@@ -133,9 +138,53 @@ export default function ProfileView() {
 
                 <section className="space-y-4">
                     <div>
+                        <p className="text-sm font-medium">Study details</p>
+                        <p className="text-sm text-muted-foreground">
+                            Information so we can make suggestions based on what
+                            you're studying!
+                        </p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="institution-name">Institution</Label>
+                        <Input
+                            id="institution-name"
+                            value={INSTITUTION_NAME}
+                            readOnly
+                            className="cursor-default"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="course-name">Course</Label>
+                        <Input
+                            id="course-name"
+                            value={COURSE_NAME}
+                            readOnly
+                            className="cursor-default"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="year-of-study">Year of study</Label>
+                        <select
+                            id="year-of-study"
+                            value={yearOfStudy}
+                            onChange={(event) => setYearOfStudy(event.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                            {YEAR_OF_STUDY_OPTIONS.map((year) => (
+                                <option key={year} value={year}>
+                                    Year {year}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </section>
+
+                <section className="space-y-4">
+                    <div>
                         <p className="text-sm font-medium">Interests</p>
                         <p className="text-sm text-muted-foreground">
-                            Add up to a few interests to personalize suggestions.
+                            Add up to a few interests to personalize suggestions,
+                            for when you want to have fun!
                         </p>
                     </div>
                     <div className="flex flex-col gap-3">
