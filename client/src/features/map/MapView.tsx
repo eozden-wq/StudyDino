@@ -23,6 +23,7 @@ import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
 // import dinoPng from '@/assets/dinosaur.png'
 import { DinoChat } from '@/components/DinoChat';
+import { useAuth0 } from '@auth0/auth0-react';
 
 type StudyGroup = {
     id: string;
@@ -108,6 +109,7 @@ const DEFAULT_ZOOM = 12;
 const GEO_ZOOM = 14;
 
 export default function MapView() {
+    const { user } = useAuth0();
     const { center, zoom, setMapState } = useMapStore();
     const mapRef = useRef<MapLibreInstance | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
@@ -118,6 +120,9 @@ export default function MapView() {
     const [nameQuery, setNameQuery] = useState('');
     const [selectedModule, setSelectedModule] = useState(MODULE_OPTIONS[0]);
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+    
+    // State to track if the image failed to load
+    const [imgError, setImgError] = useState(false);
 
     // Handler for when the map ref is set
     const handleMapRef = useCallback((map: MapLibreInstance | null) => {
@@ -313,6 +318,31 @@ export default function MapView() {
                 ))}
             </Map>
 
+            {/* Profile Button (Top Right) */}
+            <div className="absolute top-4 right-4 z-10">
+                <Link to="/profile">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0 overflow-hidden"
+                        aria-label="Go to profile"
+                    >
+                        {user?.picture && !imgError ? (
+                            <img
+                                src={user.picture}
+                                alt={user.name || "Profile"}
+                                className="h-full w-full object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={() => setImgError(true)}
+                            />
+                        ) : (
+                            <User className="h-5 w-5" />
+                        )}
+                    </Button>
+                </Link>
+            </div>
+
             <div className="absolute top-4 left-4 z-10 md:hidden">
                 <Button
                     type="button"
@@ -325,14 +355,6 @@ export default function MapView() {
                 >
                     <SlidersHorizontal className="h-5 w-5" />
                 </Button>
-            </div>
-
-            <div className="absolute top-4 right-4 z-10">
-                <Link to="/profile">
-                    <Button variant="secondary" size="icon" className="!rounded-full shadow-lg border border-white/20 backdrop-blur-md w-10 h-10 p-0">
-                        <User className="h-5 w-5" />
-                    </Button>
-                </Link>
             </div>
 
             <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-3">

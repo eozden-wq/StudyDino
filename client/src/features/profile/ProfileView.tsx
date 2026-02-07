@@ -5,6 +5,7 @@ import BackButton from "@/components/routing/BackButton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useAuth0 } from "@auth0/auth0-react"
 
 const INTEREST_OPTIONS = [
     "Productivity",
@@ -45,9 +46,13 @@ const getInitialTheme = (): ThemeMode => {
 }
 
 export default function ProfileView() {
-    const [firstName, setFirstName] = useState("Avery")
-    const [lastName, setLastName] = useState("Nguyen")
-    const [email, setEmail] = useState("avery.nguyen@example.com")
+    const { user, logout } = useAuth0(); // Get user and logout from Auth0
+    const auth0Logout = () => logout({ logoutParams: { returnTo: window.location.origin } });
+
+    // Initial state for user details from Auth0, or empty strings if not available
+    const [firstName, setFirstName] = useState(user?.given_name || "")
+    const [lastName, setLastName] = useState(user?.family_name || "")
+    const [email, setEmail] = useState(user?.email || "")
     const [selectedInterest, setSelectedInterest] = useState(
         INTEREST_OPTIONS[0]
     )
@@ -110,8 +115,8 @@ export default function ProfileView() {
                         <Label htmlFor="first-name">Name</Label>
                         <Input
                             id="first-name"
-                            value={firstName}
-                            onChange={(event) => setFirstName(event.target.value)}
+                            value={user?.given_name || firstName} // Use user data
+                            readOnly // Make readOnly
                             placeholder="Enter your name"
                         />
                     </div>
@@ -119,8 +124,8 @@ export default function ProfileView() {
                         <Label htmlFor="last-name">Surname</Label>
                         <Input
                             id="last-name"
-                            value={lastName}
-                            onChange={(event) => setLastName(event.target.value)}
+                            value={user?.family_name || lastName} // Use user data
+                            readOnly // Make readOnly
                             placeholder="Enter your surname"
                         />
                     </div>
@@ -129,8 +134,8 @@ export default function ProfileView() {
                         <Input
                             id="email"
                             type="email"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
+                            value={user?.email || email} // Use user data
+                            readOnly // Make readOnly
                             placeholder="you@example.com"
                         />
                     </div>
@@ -246,7 +251,7 @@ export default function ProfileView() {
                 </section>
 
                 <div className="mt-auto">
-                    <Button variant="destructive" className="w-full">
+                    <Button variant="destructive" className="w-full" onClick={auth0Logout}>
                         Sign out
                     </Button>
                 </div>

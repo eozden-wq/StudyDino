@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Spinner } from '@/components/ui/spinner';
+import { Auth0Authentication } from '@/components/Auth0Authentication';
 
 // Lazy load the views
 const MapView = lazy(() => import('@/features/map/MapView'));
@@ -50,9 +51,11 @@ export default function App() {
     <BrowserRouter>
       {/* We use d-vh (dynamic viewport height) for mobile browser support */}
       <div className="h-[100dvh] w-screen overflow-x-hidden bg-background">
-        <Suspense fallback={<PageLoader />}>
-          <AnimatedRoutes />
-        </Suspense>
+        <Auth0Authentication>
+          <Suspense fallback={<PageLoader />}>
+            <AnimatedRoutes />
+          </Suspense>
+        </Auth0Authentication>
       </div>
     </BrowserRouter>
   );

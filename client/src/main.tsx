@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { Auth0Provider } from '@auth0/auth0-react'
 
 const THEME_STORAGE_KEY = 'client-theme'
 
@@ -25,6 +26,14 @@ applyInitialTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Auth0Provider
+      domain="dev-3s241877k6ba3txd.us.auth0.com"
+      clientId="yO5ENS7oTRD4e6ciHKThACZFFAxB6duh"
+      authorizationParams={{
+        redirect_uri: window.location.origin
+      }}
+    >
+      <App />
+    </Auth0Provider>
   </StrictMode>,
 )
