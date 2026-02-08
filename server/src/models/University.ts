@@ -4,7 +4,6 @@ type Module = {
     moduleId: string
     name: string
     year: number
-    credits?: number
 }
 
 type Course = {
@@ -16,8 +15,7 @@ const moduleSchema = new Schema<Module>(
     {
         moduleId: { type: String, required: true },
         name: { type: String, required: true, trim: true },
-        year: { type: Number, required: true, min: 1 },
-        credits: { type: Number, min: 0 }
+        year: { type: Number, required: true, min: 1 }
     },
     { _id: false }
 )

@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Locate, SlidersHorizontal, User, Plus } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
 // import dinoPng from '@/assets/dinosaur.png'
@@ -67,6 +67,10 @@ export default function MapView() {
     const [groups, setGroups] = useState<ApiGroup[]>([]);
     const [groupsError, setGroupsError] = useState<string | null>(null);
     const [isGroupsLoading, setIsGroupsLoading] = useState(false);
+    const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
+    const [joinError, setJoinError] = useState<string | null>(null);
+    const [joinErrorGroupId, setJoinErrorGroupId] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     // State to track if the image failed to load
     const [imgError, setImgError] = useState(false);
@@ -314,6 +318,36 @@ export default function MapView() {
         );
     };
 
+    const handleJoinGroup = async (groupId: string) => {
+        setJoiningGroupId(groupId);
+        setJoinError(null);
+        setJoinErrorGroupId(null);
+        try {
+            await apiRequest<{ data: ApiGroup }>(
+                `/groups/${groupId}/join`,
+                { method: 'POST' },
+                () =>
+                    getAccessTokenSilently({
+                        authorizationParams: {
+                            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+                        },
+                    })
+            );
+            navigate(`/groups/${groupId}/members`);
+        } catch (err) {
+            setJoinErrorGroupId(groupId);
+            if (err instanceof ApiError && err.status === 409) {
+                setJoinError('You are already in a group.');
+            } else if (err instanceof ApiError) {
+                setJoinError(`Unable to join group. (${err.status})`);
+            } else {
+                setJoinError('Unable to join group.');
+            }
+        } finally {
+            setJoiningGroupId(null);
+        }
+    };
+
     return (
         <div className="relative h-full w-full">
             <Map
@@ -345,6 +379,18 @@ export default function MapView() {
                                 <p className="text-xs text-muted-foreground">
                                     {group.members.length} members
                                 </p>
+                                {joinError && joinErrorGroupId === group._id && (
+                                    <p className="text-xs text-destructive">{joinError}</p>
+                                )}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="mt-2 w-full"
+                                    onClick={() => handleJoinGroup(group._id)}
+                                    disabled={joiningGroupId === group._id}
+                                >
+                                    {joiningGroupId === group._id ? 'Joining...' : 'Join group'}
+                                </Button>
                             </div>
                         </MarkerPopup>
                     </MapMarker>

@@ -140,6 +140,48 @@ router.get("/groups/me", async (req: AuthRequest, res: Response) => {
     return res.json({ data: group ?? null })
 })
 
+router.get("/groups/:id/members", async (req: AuthRequest, res: Response) => {
+    const auth0Id = getAuth0Id(req)
+    if (!auth0Id) {
+        return res.status(401).json({ error: "Unauthorized" })
+    }
+
+    const user = await UserModel.findOne({ auth0Id }).lean()
+    if (!user?.currentGroupId) {
+        return res.status(403).json({ error: "User is not in a group" })
+    }
+
+    const group = await GroupModel.findById(req.params.id)
+        .populate("members", "firstName lastName university course year")
+        .lean()
+
+    if (!group) {
+        return res.status(404).json({ error: "Group not found" })
+    }
+
+    if (String(user.currentGroupId) !== String(group._id)) {
+        return res.status(403).json({ error: "User is not in this group" })
+    }
+
+    const members = Array.isArray(group.members)
+        ? group.members.filter((member) => typeof member === "object" && member !== null)
+        : []
+
+    return res.json({
+        data: {
+            group: {
+                _id: group._id,
+                name: group.name,
+                interest: group.interest ?? null,
+                module: group.module ?? null,
+                startAt: group.startAt,
+                endAt: group.endAt
+            },
+            members
+        }
+    })
+})
+
 router.post("/groups/search", async (req: AuthRequest, res: Response) => {
     try {
         const payload = req.body as GroupSearchPayload
@@ -341,7 +383,24 @@ router.post("/groups/:id/leave", async (req: AuthRequest, res: Response) => {
     }
 
     if (group.creator.equals(user._id)) {
-        return res.status(400).json({ error: "Creator cannot leave their group" })
+        const remainingMembers = group.members.filter((memberId) => !memberId.equals(user._id))
+        if (remainingMembers.length === 0) {
+            await GroupModel.deleteOne({ _id: group._id })
+            await UserModel.updateMany(
+                { currentGroupId: group._id },
+                { $set: { currentGroupId: null } }
+            )
+            return res.json({ data: group })
+        }
+
+        group.members = remainingMembers
+        group.creator = remainingMembers[0]!
+        await group.save()
+
+        user.currentGroupId = null
+        await user.save()
+
+        return res.json({ data: group })
     }
 
     group.members = group.members.filter((memberId) => !memberId.equals(user._id))
