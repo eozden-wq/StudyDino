@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +44,7 @@ type University = {
 
 export function AddView() {
   const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const navigate = useNavigate();
   const [eventName, setEventName] = useState('');
   const [location, setLocation] = useState('');
   const [startDateTime, setStartDateTime] = useState('');
@@ -415,7 +417,7 @@ export function AddView() {
           }),
       };
 
-      await apiRequest<{ data: unknown }>(
+      const response = await apiRequest<{ data: { _id: string } }>(
         '/groups',
         {
           method: 'POST',
@@ -428,6 +430,11 @@ export function AddView() {
             },
           })
       );
+
+      if (response?.data?._id) {
+        navigate(`/groups/${response.data._id}/members`);
+        return;
+      }
 
       setEventName('');
       setLocation('');

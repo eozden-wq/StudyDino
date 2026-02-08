@@ -8,8 +8,10 @@ import { Router } from "express"
 import type { Request, Response } from "express"
 
 import { GroupModel } from "../models/Group"
+import { GroupMessageModel } from "../models/GroupMessage"
 import { UniversityModel } from "../models/University"
 import { UserModel } from "../models/User"
+import { broadcastToGroup } from "../realtime"
 
 const router: Router = Router()
 
@@ -23,11 +25,19 @@ type FeatureExtractionPipeline = (input: string, options: { pooling: "mean"; nor
 
 let embeddingPipeline: FeatureExtractionPipeline | null = null
 
+type AuthPayload = {
+    sub?: string
+    name?: string
+    given_name?: string
+    family_name?: string
+    nickname?: string
+    preferred_username?: string
+    email?: string
+}
+
 type AuthRequest = Request & {
     auth?: {
-        payload?: {
-            sub?: string
-        }
+        payload?: AuthPayload
     }
 }
 
@@ -53,7 +63,35 @@ type GroupSearchPayload = {
     limit?: number
 }
 
-const getAuth0Id = (req: AuthRequest) => req.auth?.payload?.sub
+const getAuthPayload = (req: Request) =>
+    (req as { auth?: { payload?: AuthPayload } }).auth?.payload
+
+const getAuth0Id = (req: Request) => getAuthPayload(req)?.sub
+
+const resolveNamesFromAuth = (payload?: AuthPayload, auth0Id?: string) => {
+    const firstName = typeof payload?.given_name === "string" ? payload.given_name.trim() : ""
+    const lastName = typeof payload?.family_name === "string" ? payload.family_name.trim() : ""
+    if (firstName || lastName) {
+        return { firstName, lastName }
+    }
+
+    const fullName = typeof payload?.name === "string" ? payload.name.trim() : ""
+    if (fullName) {
+        const [first, ...rest] = fullName.split(" ")
+        return { firstName: first ?? "", lastName: rest.join(" ") }
+    }
+
+    const fallback =
+        (typeof payload?.preferred_username === "string" && payload.preferred_username.trim()) ||
+        (typeof payload?.nickname === "string" && payload.nickname.trim()) ||
+        ""
+
+    if (fallback) {
+        return { firstName: fallback, lastName: "" }
+    }
+
+    return { firstName: "", lastName: "" }
+}
 
 const parseDate = (value?: string) => {
     if (!value) return null
@@ -114,10 +152,51 @@ const moduleExistsInUniversity = async (params: {
     )
 }
 
-const getOrCreateUser = async (auth0Id: string) => {
+const getOrCreateUser = async (
+    auth0Id: string,
+    payload?: AuthPayload
+) => {
+    const resolved = resolveNamesFromAuth(payload, auth0Id)
     const existing = await UserModel.findOne({ auth0Id })
-    if (existing) return existing
-    return UserModel.create({ auth0Id })
+    if (existing) {
+        const nextFirst = resolved.firstName || existing.firstName
+        const nextLast = resolved.lastName || existing.lastName
+        if (nextFirst !== existing.firstName || nextLast !== existing.lastName) {
+            existing.firstName = nextFirst
+            existing.lastName = nextLast
+            await existing.save()
+        }
+        return existing
+    }
+    if (!resolved.firstName && !resolved.lastName) {
+        const fallbackId = auth0Id.split("|").pop() ?? auth0Id
+        return UserModel.create({
+            auth0Id,
+            firstName: `User ${fallbackId.slice(-6)}`,
+            lastName: ""
+        })
+    }
+
+    return UserModel.create({ auth0Id, ...resolved })
+}
+
+const buildMemberBroadcast = async (groupId: string) => {
+    const group = await GroupModel.findById(groupId).lean()
+    if (!group) return null
+
+    const members = await UserModel.find(
+        { _id: { $in: group.members } },
+        "firstName lastName university course year"
+    ).lean()
+
+    return members.map((member) => ({
+        _id: String(member._id),
+        firstName: member.firstName,
+        lastName: member.lastName,
+        university: member.university,
+        course: member.course,
+        year: member.year
+    }))
 }
 
 router.get("/groups", async (_req: Request, res: Response) => {
@@ -234,7 +313,7 @@ router.post("/groups", async (req: AuthRequest, res: Response) => {
         return res.status(401).json({ error: "Unauthorized" })
     }
 
-    const user = await getOrCreateUser(auth0Id)
+    const user = await getOrCreateUser(auth0Id, getAuthPayload(req))
     if (user.currentGroupId) {
         return res.status(409).json({ error: "User already in a group" })
     }
@@ -329,7 +408,7 @@ router.post("/groups/:id/join", async (req: AuthRequest, res: Response) => {
         return res.status(401).json({ error: "Unauthorized" })
     }
 
-    const user = await getOrCreateUser(auth0Id)
+    const user = await getOrCreateUser(auth0Id, getAuthPayload(req))
     if (user.currentGroupId) {
         return res.status(409).json({ error: "User already in a group" })
     }
@@ -349,6 +428,11 @@ router.post("/groups/:id/join", async (req: AuthRequest, res: Response) => {
 
     user.currentGroupId = group._id
     await user.save()
+
+    const members = await buildMemberBroadcast(String(group._id))
+    if (members) {
+        broadcastToGroup(String(group._id), { type: "members", members })
+    }
 
     return res.json({ data: group })
 })
@@ -386,10 +470,12 @@ router.post("/groups/:id/leave", async (req: AuthRequest, res: Response) => {
         const remainingMembers = group.members.filter((memberId) => !memberId.equals(user._id))
         if (remainingMembers.length === 0) {
             await GroupModel.deleteOne({ _id: group._id })
+            await GroupMessageModel.deleteMany({ groupId: group._id })
             await UserModel.updateMany(
                 { currentGroupId: group._id },
                 { $set: { currentGroupId: null } }
             )
+            broadcastToGroup(String(group._id), { type: "group-closed" })
             return res.json({ data: group })
         }
 
@@ -400,6 +486,11 @@ router.post("/groups/:id/leave", async (req: AuthRequest, res: Response) => {
         user.currentGroupId = null
         await user.save()
 
+        const members = await buildMemberBroadcast(String(group._id))
+        if (members) {
+            broadcastToGroup(String(group._id), { type: "members", members })
+        }
+
         return res.json({ data: group })
     }
 
@@ -408,6 +499,11 @@ router.post("/groups/:id/leave", async (req: AuthRequest, res: Response) => {
 
     user.currentGroupId = null
     await user.save()
+
+    const members = await buildMemberBroadcast(String(group._id))
+    if (members) {
+        broadcastToGroup(String(group._id), { type: "members", members })
+    }
 
     return res.json({ data: group })
 })
