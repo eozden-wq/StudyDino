@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAuth0 } from "@auth0/auth0-react"
 
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,6 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
 import { apiRequest, ApiError } from "@/lib/api"
@@ -27,7 +26,21 @@ type MeResponse = {
     }
 }
 
-const YEAR_OPTIONS = [1, 2, 3, 4, 5, 6]
+type UniversityModule = {
+    moduleId: string
+    name: string
+    year: number
+}
+
+type UniversityCourse = {
+    name: string
+    modules: UniversityModule[]
+}
+
+type University = {
+    name: string
+    courses: UniversityCourse[]
+}
 
 const formatApiError = (error: ApiError) => {
     const body =
@@ -57,10 +70,12 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
     const [needsOnboarding, setNeedsOnboarding] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [errorDetails, setErrorDetails] = useState<string | null>(null)
+    const [isCatalogLoading, setIsCatalogLoading] = useState(false)
 
     const [university, setUniversity] = useState("")
     const [course, setCourse] = useState("")
-    const [year, setYear] = useState(String(YEAR_OPTIONS[0]))
+    const [year, setYear] = useState("")
+    const [catalog, setCatalog] = useState<University[]>([])
 
     useEffect(() => {
         if (!isAuthenticated) return
@@ -85,7 +100,7 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
                     setNeedsOnboarding(true)
                     setUniversity(response?.data?.university ?? "")
                     setCourse(response?.data?.course ?? "")
-                    setYear(response?.data?.year ? String(response.data.year) : String(YEAR_OPTIONS[0]))
+                    setYear(response?.data?.year ? String(response.data.year) : "")
                 } else {
                     setNeedsOnboarding(false)
                 }
@@ -112,6 +127,85 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
 
         void checkProfile()
     }, [getAccessTokenSilently, isAuthenticated])
+
+    useEffect(() => {
+        if (!needsOnboarding) return
+
+        const loadCatalog = async () => {
+            setIsCatalogLoading(true)
+            try {
+                const response = await apiRequest<{ data: University[] }>(
+                    "/universities",
+                    { method: "GET" },
+                    () =>
+                        getAccessTokenSilently({
+                            authorizationParams: {
+                                audience: import.meta.env.VITE_AUTH0_AUDIENCE
+                            }
+                        })
+                )
+                setCatalog(response.data ?? [])
+            } catch (err) {
+                setError("Unable to load university catalog.")
+                if (err instanceof ApiError) {
+                    setErrorDetails(formatApiError(err))
+                } else {
+                    setErrorDetails(formatUnknownError(err))
+                }
+            } finally {
+                setIsCatalogLoading(false)
+            }
+        }
+
+        void loadCatalog()
+    }, [getAccessTokenSilently, needsOnboarding])
+
+    const universityOptions = useMemo(
+        () => catalog.map((entry) => entry.name),
+        [catalog]
+    )
+
+    const selectedUniversity = useMemo(
+        () => catalog.find((entry) => entry.name === university),
+        [catalog, university]
+    )
+
+    const courseOptions = useMemo(
+        () => selectedUniversity?.courses.map((entry) => entry.name) ?? [],
+        [selectedUniversity]
+    )
+
+    const selectedCourse = useMemo(
+        () => selectedUniversity?.courses.find((entry) => entry.name === course),
+        [selectedUniversity, course]
+    )
+
+    const yearOptions = useMemo(() => {
+        const years = new Set<number>()
+        selectedCourse?.modules.forEach((module) => years.add(module.year))
+        return Array.from(years).sort((a, b) => a - b)
+    }, [selectedCourse])
+
+    useEffect(() => {
+        if (!selectedUniversity) {
+            setCourse("")
+            setYear("")
+            return
+        }
+        if (!courseOptions.includes(course)) {
+            setCourse("")
+        }
+    }, [courseOptions, course, selectedUniversity])
+
+    useEffect(() => {
+        if (!selectedCourse) {
+            setYear("")
+            return
+        }
+        if (yearOptions.length > 0 && !yearOptions.includes(Number(year))) {
+            setYear(String(yearOptions[0]))
+        }
+    }, [selectedCourse, yearOptions, year])
 
     const handleSubmit = async () => {
         if (!university.trim() || !course.trim() || !year) {
@@ -179,21 +273,41 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="onboarding-university">University</Label>
-                        <Input
+                        <select
                             id="onboarding-university"
                             value={university}
                             onChange={(event) => setUniversity(event.target.value)}
-                            placeholder="Your university"
-                        />
+                            disabled={isCatalogLoading || universityOptions.length === 0}
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                            <option value="" disabled>
+                                {isCatalogLoading ? "Loading universities..." : "Select a university"}
+                            </option>
+                            {universityOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="onboarding-course">Course</Label>
-                        <Input
+                        <select
                             id="onboarding-course"
                             value={course}
                             onChange={(event) => setCourse(event.target.value)}
-                            placeholder="Your course"
-                        />
+                            disabled={!selectedUniversity || courseOptions.length === 0}
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                            <option value="" disabled>
+                                {selectedUniversity ? "Select a course" : "Choose a university first"}
+                            </option>
+                            {courseOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="onboarding-year">Year of study</Label>
@@ -201,9 +315,13 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
                             id="onboarding-year"
                             value={year}
                             onChange={(event) => setYear(event.target.value)}
+                            disabled={!selectedCourse || yearOptions.length === 0}
                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                            {YEAR_OPTIONS.map((option) => (
+                            <option value="" disabled>
+                                {selectedCourse ? "Select a year" : "Choose a course first"}
+                            </option>
+                            {yearOptions.map((option) => (
                                 <option key={option} value={option}>
                                     Year {option}
                                 </option>
