@@ -24,92 +24,34 @@ import type { Map as MapLibreInstance } from 'maplibre-gl';
 // import dinoPng from '@/assets/dinosaur.png'
 import { DinoChat } from '@/components/DinoChat';
 import { useAuth0 } from '@auth0/auth0-react';
+import { apiRequest, ApiError } from '@/lib/api';
 
-type StudyGroup = {
-    id: string;
+type ApiGroup = {
+    _id: string;
     name: string;
-    module: string;
-    interests: string[];
-    members: number;
-    description: string;
+    creator: string;
+    members: string[];
+    startAt: string;
+    endAt: string;
     location: {
-        lng: number;
-        lat: number;
+        type: 'Point';
+        coordinates: [number, number];
     };
+    interest?: string | null;
+    module?: {
+        moduleId: string;
+        name: string;
+        course: string;
+        university?: string;
+    } | null;
 };
-
-const GROUPS: StudyGroup[] = [
-    {
-        id: 'group-ux-01',
-        name: 'Design Systems Collective',
-        module: 'Human Computer Interaction',
-        interests: ['Design', 'Productivity', 'Reading'],
-        members: 12,
-        description: 'Weekly critique and component library study sessions.',
-        location: { lng: -1.5749, lat: 54.7759 },
-    },
-    {
-        id: 'group-ai-02',
-        name: 'Applied AI Lab',
-        module: 'Machine Learning',
-        interests: ['Productivity', 'Gaming', 'Reading'],
-        members: 18,
-        description: 'Project-based practice with supervised and unsupervised models.',
-        location: { lng: -1.5702, lat: 54.7785 },
-    },
-    {
-        id: 'group-web-03',
-        name: 'Frontend Explorers',
-        module: 'Web Development',
-        interests: ['Design', 'Photography', 'Music'],
-        members: 9,
-        description: 'Build-along sessions on modern UI patterns and accessibility.',
-        location: { lng: -1.5794, lat: 54.7808 },
-    },
-    {
-        id: 'group-data-04',
-        name: 'Data Insight Circle',
-        module: 'Data Analytics',
-        interests: ['Reading', 'Fitness', 'Outdoors'],
-        members: 14,
-        description: 'Case study breakdowns and dashboard review meetups.',
-        location: { lng: -1.5821, lat: 54.7734 },
-    },
-    {
-        id: 'group-sec-05',
-        name: 'Security Sprint',
-        module: 'Cyber Security',
-        interests: ['Gaming', 'Productivity', 'Outdoors'],
-        members: 11,
-        description: 'CTF practice and threat modeling sessions.',
-        location: { lng: -1.5683, lat: 54.7721 },
-    },
-    {
-        id: 'group-cloud-06',
-        name: 'Cloud Builders',
-        module: 'Cloud Computing',
-        interests: ['Music', 'Productivity', 'Reading'],
-        members: 16,
-        description: 'Infrastructure labs with shared notes and diagrams.',
-        location: { lng: -1.5718, lat: 54.7816 },
-    },
-];
-
-const MODULE_OPTIONS = [
-    'All modules',
-    ...Array.from(new Set(GROUPS.map((group) => group.module))),
-];
-
-const INTEREST_OPTIONS = Array.from(
-    new Set(GROUPS.flatMap((group) => group.interests))
-);
 
 const DEFAULT_CENTER: [number, number] = [-1.57566, 54.77676];
 const DEFAULT_ZOOM = 12;
 const GEO_ZOOM = 14;
 
 export default function MapView() {
-    const { user } = useAuth0();
+    const { user, isAuthenticated, getAccessTokenSilently } = useAuth0();
     const { center, zoom, setMapState } = useMapStore();
     const mapRef = useRef<MapLibreInstance | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
@@ -118,9 +60,12 @@ export default function MapView() {
     const [geoError, setGeoError] = useState<string | null>(null);
     const pendingLocationRef = useRef<{ lng: number; lat: number } | null>(null);
     const [nameQuery, setNameQuery] = useState('');
-    const [selectedModule, setSelectedModule] = useState(MODULE_OPTIONS[0]);
+    const [selectedModule, setSelectedModule] = useState('All modules');
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-    
+    const [groups, setGroups] = useState<ApiGroup[]>([]);
+    const [groupsError, setGroupsError] = useState<string | null>(null);
+    const [isGroupsLoading, setIsGroupsLoading] = useState(false);
+
     // State to track if the image failed to load
     const [imgError, setImgError] = useState(false);
 
@@ -210,27 +155,97 @@ export default function MapView() {
         );
     }, [applyLiveLocation, center, zoom]);
 
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setGroups([]);
+            setGroupsError(null);
+            setIsGroupsLoading(false);
+            return;
+        }
+
+        let isActive = true;
+        const loadGroups = async () => {
+            setIsGroupsLoading(true);
+            setGroupsError(null);
+            try {
+                const response = await apiRequest<{ data: ApiGroup[] }>(
+                    '/groups',
+                    { method: 'GET' },
+                    () =>
+                        getAccessTokenSilently({
+                            authorizationParams: {
+                                audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+                            },
+                        })
+                );
+                if (!isActive) return;
+                setGroups(response.data ?? []);
+            } catch (err) {
+                if (!isActive) return;
+                setGroups([]);
+                if (err instanceof ApiError) {
+                    setGroupsError(`Unable to load groups. (${err.status})`);
+                } else {
+                    setGroupsError('Unable to load groups.');
+                }
+            } finally {
+                if (isActive) {
+                    setIsGroupsLoading(false);
+                }
+            }
+        };
+
+        void loadGroups();
+
+        return () => {
+            isActive = false;
+        };
+    }, [getAccessTokenSilently, isAuthenticated]);
+
+    const moduleOptions = useMemo(() => {
+        const modules = new Set<string>();
+        groups.forEach((group) => {
+            if (group.module?.name) {
+                modules.add(group.module.name);
+            }
+        });
+        return ['All modules', ...Array.from(modules)];
+    }, [groups]);
+
+    const interestOptions = useMemo(() => {
+        const interests = new Set<string>();
+        groups.forEach((group) => {
+            if (group.interest) {
+                interests.add(group.interest);
+            }
+        });
+        return Array.from(interests);
+    }, [groups]);
+
+    const getGroupTitle = useCallback((group: ApiGroup) => {
+        return group.name || group.module?.name || group.interest || 'Study group';
+    }, []);
+
     const filteredGroups = useMemo(() => {
         const trimmedQuery = nameQuery.trim().toLowerCase();
 
-        return GROUPS.filter((group) => {
+        return groups.filter((group) => {
+            const groupName = (group.name || '').toLowerCase();
             const matchesName = trimmedQuery
-                ? group.name.toLowerCase().includes(trimmedQuery)
+                ? groupName.includes(trimmedQuery)
                 : true;
             const matchesModule =
                 selectedModule === 'All modules'
                     ? true
-                    : group.module === selectedModule;
+                    : group.module?.name === selectedModule;
             const matchesInterests =
                 selectedInterests.length === 0
                     ? true
-                    : group.interests.some((interest) =>
-                        selectedInterests.includes(interest)
-                    );
+                    : !!group.interest && selectedInterests.includes(group.interest);
 
             return matchesName && matchesModule && matchesInterests;
         });
-    }, [nameQuery, selectedModule, selectedInterests]);
+    }, [getGroupTitle, groups, nameQuery, selectedModule, selectedInterests]);
 
     const handleToggleInterest = (interest: string) => {
         setSelectedInterests((prev) =>
@@ -242,7 +257,7 @@ export default function MapView() {
 
     const handleClearFilters = () => {
         setNameQuery('');
-        setSelectedModule(MODULE_OPTIONS[0]);
+        setSelectedModule('All modules');
         setSelectedInterests([]);
     };
 
@@ -296,9 +311,9 @@ export default function MapView() {
                 />
                 {filteredGroups.map((group) => (
                     <MapMarker
-                        key={group.id}
-                        longitude={group.location.lng}
-                        latitude={group.location.lat}
+                        key={group._id}
+                        longitude={group.location.coordinates[0]}
+                        latitude={group.location.coordinates[1]}
                     >
                         <MarkerContent className="rounded-full bg-primary/20 p-1">
                             <div className="h-3 w-3 rounded-full bg-primary shadow-sm" />
@@ -307,10 +322,10 @@ export default function MapView() {
                             <div className="space-y-1">
                                 <p className="text-sm font-semibold">{group.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {group.module}
+                                    {group.module?.name ?? group.interest ?? 'Interest group'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {group.members} members
+                                    {group.members.length} members
                                 </p>
                             </div>
                         </MarkerPopup>
@@ -423,7 +438,7 @@ export default function MapView() {
                             }
                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                            {MODULE_OPTIONS.map((module) => (
+                            {moduleOptions.map((module) => (
                                 <option key={module} value={module}>
                                     {module}
                                 </option>
@@ -433,7 +448,7 @@ export default function MapView() {
                     <div className="space-y-3">
                         <Label>Common interests</Label>
                         <div className="flex flex-wrap gap-2 pb-2">
-                            {INTEREST_OPTIONS.map((interest) => {
+                            {interestOptions.map((interest) => {
                                 const isActive = selectedInterests.includes(
                                     interest
                                 );
@@ -462,10 +477,16 @@ export default function MapView() {
                             {filteredGroups.length} group
                             {filteredGroups.length === 1 ? '' : 's'} shown
                         </p>
+                        {groupsError && (
+                            <p className="text-sm text-destructive">
+                                {groupsError}
+                            </p>
+                        )}
                         <Button
                             type="button"
                             variant="secondary"
                             onClick={handleClearFilters}
+                            disabled={isGroupsLoading}
                         >
                             Clear filters
                         </Button>

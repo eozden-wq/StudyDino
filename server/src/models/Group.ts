@@ -32,6 +32,7 @@ const groupLocationSchema = new Schema<GroupLocation>(
 
 const groupSchema = new Schema(
     {
+        name: { type: String, required: true, trim: true },
         creator: { type: Schema.Types.ObjectId, ref: "User", required: true },
         members: { type: [Schema.Types.ObjectId], ref: "User", default: [] },
         startAt: { type: Date, required: true },

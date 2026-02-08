@@ -16,6 +16,7 @@ type AuthRequest = Request & {
 }
 
 type CreateGroupPayload = {
+    name?: string
     startAt?: string
     endAt?: string
     location?: {
@@ -96,8 +97,13 @@ router.post("/groups", async (req: AuthRequest, res: Response) => {
     }
 
     const payload = req.body as CreateGroupPayload
+    const name = typeof payload.name === "string" ? payload.name.trim() : ""
     const startAt = parseDate(payload.startAt)
     const endAt = parseDate(payload.endAt)
+
+    if (!name) {
+        return res.status(400).json({ error: "name is required" })
+    }
 
     if (!startAt || !endAt) {
         return res.status(400).json({ error: "startAt and endAt are required" })
@@ -152,6 +158,7 @@ router.post("/groups", async (req: AuthRequest, res: Response) => {
     }
 
     const group = await GroupModel.create({
+        name,
         creator: user._id,
         members: [user._id],
         startAt,

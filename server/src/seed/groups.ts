@@ -66,6 +66,7 @@ const buildDate = (offsetHours: number) => new Date(Date.now() + offsetHours * 6
 
 const seedGroups = [
     {
+        name: "Algorithms revision",
         creator: "seed|alice",
         members: ["seed|alice", "seed|bob"],
         startAt: buildDate(2),
@@ -74,6 +75,7 @@ const seedGroups = [
         interest: "Algorithms revision"
     },
     {
+        name: "Game Theory clinic",
         creator: "seed|carla",
         members: ["seed|carla"],
         startAt: buildDate(24),
@@ -87,6 +89,7 @@ const seedGroups = [
         }
     },
     {
+        name: "Computer Vision lab",
         creator: "seed|dave",
         members: ["seed|dave", "seed|ella"],
         startAt: buildDate(48),
@@ -100,6 +103,7 @@ const seedGroups = [
         }
     },
     {
+        name: "Study sprint",
         creator: "seed|finn",
         members: ["seed|finn"],
         startAt: buildDate(6),
@@ -134,6 +138,7 @@ const run = async () => {
             })
 
             const createdGroup = await GroupModel.create({
+                name: group.name,
                 creator: creator._id,
                 members: memberIds,
                 startAt: group.startAt,
