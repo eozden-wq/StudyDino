@@ -383,7 +383,7 @@ export default function GroupMembersView({ groupId }: GroupMembersViewProps) {
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-sm text-muted-foreground">
-                                        {group.module
+                                        {group?.module
                                             ? "This group is focused on the selected module."
                                             : "This group is focused on a shared interest."}
                                     </p>
