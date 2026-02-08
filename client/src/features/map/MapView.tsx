@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Locate, SlidersHorizontal, User, Plus } from 'lucide-react';
+import { Loader2, Locate, SlidersHorizontal, User, Plus, Flame } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { useMapStore } from '@/store/map-store';
 import type { Map as MapLibreInstance } from 'maplibre-gl';
@@ -397,8 +397,12 @@ export default function MapView() {
                 ))}
             </Map>
 
-            {/* Profile Button (Top Right) */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Top Right Controls: Streak & Profile */}
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+                <div className="flex h-10 items-center gap-1.5 rounded-full bg-background/80 px-3 shadow-lg backdrop-blur-md border border-border">
+                    <Flame className="h-4 w-4 text-orange-500 fill-orange-500" />
+                    <span className="text-sm font-bold text-foreground">1</span>
+                </div>
                 <Link to="/profile">
                     <Button
                         type="button"
@@ -457,7 +461,7 @@ export default function MapView() {
                         <Locate className="h-5 w-5" />
                     )}
                 </Button>
-                <DinoChat />
+                <DinoChat onJoinGroup={handleJoinGroup} />
             </div>
 
             <div className="absolute bottom-4 left-4 z-10">

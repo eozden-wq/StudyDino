@@ -47,7 +47,7 @@ if (!auth0Domain || !auth0ClientId) {
         clientId={auth0ClientId}
         authorizationParams={{
           redirect_uri: auth0RedirectUri ?? window.location.origin,
-          audience: auth0Audience,
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE ?? "https://studydino-api",
         }}
       >
         <App />

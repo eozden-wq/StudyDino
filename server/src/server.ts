@@ -1,4 +1,5 @@
 // src/server.ts
+import "dotenv/config";
 import express from 'express';
 import http, { type IncomingMessage } from 'http';
 import mongoose from 'mongoose';
@@ -11,12 +12,12 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import meRoutes from './routes/me';
 import universityRoutes from './routes/universities';
 import groupRoutes from './routes/groups';
+import geminiRoutes from './routes/gemini';
 import { GroupModel } from './models/Group';
 import { UserModel } from './models/User';
 import { GroupMessageModel } from './models/GroupMessage';
 import { broadcastToGroup, registerSocket, unregisterSocket } from './realtime';
 
-dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
@@ -47,10 +48,16 @@ const checkJwt = AUTH0_DOMAIN && AUTH0_AUDIENCE
     : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
 
 // MongoDB Connection
+const mongoUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
+
+if (!mongoUri) {
+  throw new Error("Missing MONGODB_URI (or DATABASE_URL) in .env");
+}
+
 mongoose
-    .connect(process.env.DATABASE_URL as string)
-    .then(() => console.log("MongoDB connected"))
-    .catch((err) => console.error("MongoDB connection error:", err));
+  .connect(mongoUri)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 const cleanupGroups = async () => {
     const now = new Date();
@@ -199,6 +206,7 @@ app.use(checkJwt);
 app.use(meRoutes);
 app.use(universityRoutes);
 app.use(groupRoutes);
+app.use(geminiRoutes);
 
 server.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
