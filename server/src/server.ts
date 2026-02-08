@@ -7,6 +7,7 @@ import { auth } from 'express-oauth2-jwt-bearer';
 
 import meRoutes from './routes/me';
 import universityRoutes from './routes/universities';
+import groupRoutes from './routes/groups';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.get('/', (_req, res) => {
 app.use(checkJwt);
 app.use(meRoutes);
 app.use(universityRoutes);
+app.use(groupRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

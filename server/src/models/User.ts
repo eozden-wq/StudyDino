@@ -7,7 +7,8 @@ const userSchema = new Schema(
         lastName: { type: String, trim: true, default: "" },
         university: { type: String, trim: true, default: "" },
         course: { type: String, trim: true, default: "" },
-        year: { type: Number, min: 1 }
+        year: { type: Number, min: 1 },
+        currentGroupId: { type: Schema.Types.ObjectId, ref: "Group", default: null }
     },
     { timestamps: true }
 )
