@@ -61,7 +61,9 @@ export default function MapView() {
     const pendingLocationRef = useRef<{ lng: number; lat: number } | null>(null);
     const [nameQuery, setNameQuery] = useState('');
     const [selectedModule, setSelectedModule] = useState('All modules');
-    const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+    const [interestQuery, setInterestQuery] = useState('');
+    const [interestError, setInterestError] = useState<string | null>(null);
+    const [isInterestSearching, setIsInterestSearching] = useState(false);
     const [groups, setGroups] = useState<ApiGroup[]>([]);
     const [groupsError, setGroupsError] = useState<string | null>(null);
     const [isGroupsLoading, setIsGroupsLoading] = useState(false);
@@ -155,6 +157,33 @@ export default function MapView() {
         );
     }, [applyLiveLocation, center, zoom]);
 
+    const loadGroups = useCallback(async () => {
+        setIsGroupsLoading(true);
+        setGroupsError(null);
+        try {
+            const response = await apiRequest<{ data: ApiGroup[] }>(
+                '/groups',
+                { method: 'GET' },
+                () =>
+                    getAccessTokenSilently({
+                        authorizationParams: {
+                            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+                        },
+                    })
+            );
+            setGroups(response.data ?? []);
+        } catch (err) {
+            setGroups([]);
+            if (err instanceof ApiError) {
+                setGroupsError(`Unable to load groups. (${err.status})`);
+            } else {
+                setGroupsError('Unable to load groups.');
+            }
+        } finally {
+            setIsGroupsLoading(false);
+        }
+    }, [getAccessTokenSilently]);
+
     useEffect(() => {
         if (!isAuthenticated) {
             setGroups([]);
@@ -163,44 +192,8 @@ export default function MapView() {
             return;
         }
 
-        let isActive = true;
-        const loadGroups = async () => {
-            setIsGroupsLoading(true);
-            setGroupsError(null);
-            try {
-                const response = await apiRequest<{ data: ApiGroup[] }>(
-                    '/groups',
-                    { method: 'GET' },
-                    () =>
-                        getAccessTokenSilently({
-                            authorizationParams: {
-                                audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-                            },
-                        })
-                );
-                if (!isActive) return;
-                setGroups(response.data ?? []);
-            } catch (err) {
-                if (!isActive) return;
-                setGroups([]);
-                if (err instanceof ApiError) {
-                    setGroupsError(`Unable to load groups. (${err.status})`);
-                } else {
-                    setGroupsError('Unable to load groups.');
-                }
-            } finally {
-                if (isActive) {
-                    setIsGroupsLoading(false);
-                }
-            }
-        };
-
         void loadGroups();
-
-        return () => {
-            isActive = false;
-        };
-    }, [getAccessTokenSilently, isAuthenticated]);
+    }, [isAuthenticated, loadGroups]);
 
     const moduleOptions = useMemo(() => {
         const modules = new Set<string>();
@@ -210,16 +203,6 @@ export default function MapView() {
             }
         });
         return ['All modules', ...Array.from(modules)];
-    }, [groups]);
-
-    const interestOptions = useMemo(() => {
-        const interests = new Set<string>();
-        groups.forEach((group) => {
-            if (group.interest) {
-                interests.add(group.interest);
-            }
-        });
-        return Array.from(interests);
     }, [groups]);
 
     const getGroupTitle = useCallback((group: ApiGroup) => {
@@ -238,27 +221,62 @@ export default function MapView() {
                 selectedModule === 'All modules'
                     ? true
                     : group.module?.name === selectedModule;
-            const matchesInterests =
-                selectedInterests.length === 0
-                    ? true
-                    : !!group.interest && selectedInterests.includes(group.interest);
 
-            return matchesName && matchesModule && matchesInterests;
+            return matchesName && matchesModule;
         });
-    }, [getGroupTitle, groups, nameQuery, selectedModule, selectedInterests]);
-
-    const handleToggleInterest = (interest: string) => {
-        setSelectedInterests((prev) =>
-            prev.includes(interest)
-                ? prev.filter((item) => item !== interest)
-                : [...prev, interest]
-        );
-    };
+    }, [getGroupTitle, groups, nameQuery, selectedModule]);
 
     const handleClearFilters = () => {
         setNameQuery('');
         setSelectedModule('All modules');
-        setSelectedInterests([]);
+        setInterestQuery('');
+        setInterestError(null);
+        if (isAuthenticated) {
+            void loadGroups();
+        }
+    };
+
+    const handleInterestSearch = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!isAuthenticated) {
+            setInterestError('Sign in to search interests.');
+            return;
+        }
+
+        const query = interestQuery.trim();
+        if (!query) {
+            setInterestError(null);
+            await loadGroups();
+            return;
+        }
+
+        setIsInterestSearching(true);
+        setInterestError(null);
+        try {
+            const response = await apiRequest<{ data: ApiGroup[] }>(
+                '/groups/search',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ query }),
+                },
+                () =>
+                    getAccessTokenSilently({
+                        authorizationParams: {
+                            audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+                        },
+                    })
+            );
+            setGroups(response.data ?? []);
+        } catch (err) {
+            if (err instanceof ApiError) {
+                setInterestError(`Interest search failed. (${err.status})`);
+            } else {
+                setInterestError('Interest search failed.');
+            }
+        } finally {
+            setIsInterestSearching(false);
+        }
     };
 
     const handleRecenter = () => {
@@ -446,29 +464,29 @@ export default function MapView() {
                         </select>
                     </div>
                     <div className="space-y-3">
-                        <Label>Common interests</Label>
-                        <div className="flex flex-wrap gap-2 pb-2">
-                            {interestOptions.map((interest) => {
-                                const isActive = selectedInterests.includes(
-                                    interest
-                                );
-                                return (
-                                    <button
-                                        key={interest}
-                                        type="button"
-                                        onClick={() =>
-                                            handleToggleInterest(interest)
-                                        }
-                                        className={`inline-flex items-center rounded-full border px-3 py-1 text-sm transition ${isActive
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border bg-background text-foreground'
-                                            }`}
-                                    >
-                                        {interest}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <Label htmlFor="map-interest-search">Interest search</Label>
+                        <form onSubmit={handleInterestSearch} className="space-y-2">
+                            <div className="flex gap-2">
+                                <Input
+                                    id="map-interest-search"
+                                    value={interestQuery}
+                                    onChange={(event) => setInterestQuery(event.target.value)}
+                                    placeholder="Search interests"
+                                />
+                                <Button
+                                    type="submit"
+                                    variant="secondary"
+                                    disabled={isInterestSearching}
+                                >
+                                    {isInterestSearching ? 'Searching...' : 'Search'}
+                                </Button>
+                            </div>
+                            {interestError && (
+                                <p className="text-xs text-destructive">
+                                    {interestError}
+                                </p>
+                            )}
+                        </form>
                     </div>
                 </CardContent>
                 <CardFooter className="border-t pt-5">

@@ -7,17 +7,26 @@
   "scripts": {
     "build": "tsc",
     "start": "node ./dist/app.js",
-    "dev": "ts-node-dev --respawn src/server.ts"
+    "dev": "ts-node-dev --respawn src/bootstrap.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.34.5"
+    }
+  },
   "dependencies": {
+    "@img/sharp-linux-x64": "^0.34.5",
+    "@xenova/transformers": "^2.17.2",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
+    "express-oauth2-jwt-bearer": "^1.7.4",
     "mongoose": "^9.1.6",
+    "sharp": "^0.34.5",
     "ts-node-dev": "^2.0.0"
   },
   "devDependencies": {

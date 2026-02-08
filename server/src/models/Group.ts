@@ -39,6 +39,7 @@ const groupSchema = new Schema(
         endAt: { type: Date, required: true },
         location: { type: groupLocationSchema, required: true },
         interest: { type: String, trim: true },
+        interestEmbedding: { type: [Number], default: null },
         module: { type: groupModuleSchema }
     },
     { timestamps: true }

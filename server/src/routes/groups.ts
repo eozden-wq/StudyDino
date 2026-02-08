@@ -1,3 +1,9 @@
+/// <reference path="../types/transformers-dist.d.ts" />
+import "dotenv/config"
+
+if (!process.env.TRANSFORMERS_DISABLE_SHARP) {
+    process.env.TRANSFORMERS_DISABLE_SHARP = "1"
+}
 import { Router } from "express"
 import type { Request, Response } from "express"
 
@@ -6,6 +12,16 @@ import { UniversityModel } from "../models/University"
 import { UserModel } from "../models/User"
 
 const router: Router = Router()
+
+const TRANSFORMERS_MODEL = process.env.TRANSFORMERS_MODEL ?? "Xenova/all-MiniLM-L6-v2"
+const VECTOR_INDEX = process.env.VECTOR_INDEX ?? "groups_interest_vector"
+const VECTOR_FIELD = "interestEmbedding"
+
+type FeatureExtractionPipeline = (input: string, options: { pooling: "mean"; normalize: boolean }) => Promise<{
+    data: ArrayLike<number>
+}>
+
+let embeddingPipeline: FeatureExtractionPipeline | null = null
 
 type AuthRequest = Request & {
     auth?: {
@@ -32,6 +48,11 @@ type CreateGroupPayload = {
     }
 }
 
+type GroupSearchPayload = {
+    query?: string
+    limit?: number
+}
+
 const getAuth0Id = (req: AuthRequest) => req.auth?.payload?.sub
 
 const parseDate = (value?: string) => {
@@ -41,6 +62,40 @@ const parseDate = (value?: string) => {
 }
 
 const isNonEmptyString = (value?: string) => typeof value === "string" && value.trim().length > 0
+
+const getEmbeddingPipeline = async (): Promise<FeatureExtractionPipeline> => {
+    if (embeddingPipeline) return embeddingPipeline
+
+    if (!process.env.TRANSFORMERS_DISABLE_SHARP) {
+        process.env.TRANSFORMERS_DISABLE_SHARP = "1"
+    }
+
+    const transformers = await import("@xenova/transformers")
+    const env = (transformers as { env?: { allowLocalModels?: boolean; allowRemoteModels?: boolean; useFS?: boolean; useFSCache?: boolean } }).env
+    if (env) {
+        env.allowLocalModels = false
+        env.allowRemoteModels = true
+        env.useFS = false
+        env.useFSCache = false
+    }
+    const { pipeline } = transformers as {
+        pipeline: (task: string, model?: string) => Promise<FeatureExtractionPipeline>
+    }
+    const instance = await pipeline("feature-extraction", TRANSFORMERS_MODEL)
+    embeddingPipeline = instance
+    return instance
+}
+
+const getInterestEmbedding = async (value: string) => {
+    const embed = await getEmbeddingPipeline()
+    const result = await embed(value, { pooling: "mean", normalize: true })
+    const vector = Array.from(result.data, (item) => Number(item))
+    if (vector.length === 0) {
+        throw new Error("Local embeddings returned no data")
+    }
+
+    return vector
+}
 
 const moduleExistsInUniversity = async (params: {
     universityName: string
@@ -83,6 +138,52 @@ router.get("/groups/me", async (req: AuthRequest, res: Response) => {
 
     const group = await GroupModel.findById(user.currentGroupId).lean()
     return res.json({ data: group ?? null })
+})
+
+router.post("/groups/search", async (req: AuthRequest, res: Response) => {
+    try {
+        const payload = req.body as GroupSearchPayload
+        const query = typeof payload.query === "string" ? payload.query.trim() : ""
+        const limit =
+            typeof payload.limit === "number" && payload.limit > 0
+                ? Math.min(payload.limit, 50)
+                : 20
+
+        if (!query) {
+            return res.status(400).json({ error: "query is required" })
+        }
+
+        const queryVector = await getInterestEmbedding(query)
+        const results = await GroupModel.aggregate([
+            {
+                $vectorSearch: {
+                    index: VECTOR_INDEX,
+                    path: VECTOR_FIELD,
+                    queryVector,
+                    numCandidates: Math.max(limit * 5, 50),
+                    limit
+                }
+            },
+            {
+                $project: {
+                    score: { $meta: "vectorSearchScore" },
+                    name: 1,
+                    creator: 1,
+                    members: 1,
+                    startAt: 1,
+                    endAt: 1,
+                    location: 1,
+                    interest: 1,
+                    module: 1
+                }
+            }
+        ])
+
+        return res.json({ data: results })
+    } catch (err) {
+        console.error("Vector search failed", err)
+        return res.status(500).json({ error: "Vector search failed" })
+    }
 })
 
 router.post("/groups", async (req: AuthRequest, res: Response) => {
@@ -157,6 +258,11 @@ router.post("/groups", async (req: AuthRequest, res: Response) => {
         }
     }
 
+    const interestText = hasInterest ? (payload.interest?.trim() ?? "") : ""
+    const interestEmbedding: number[] | null = hasInterest
+        ? await getInterestEmbedding(interestText)
+        : null
+
     const group = await GroupModel.create({
         name,
         creator: user._id,
@@ -164,7 +270,8 @@ router.post("/groups", async (req: AuthRequest, res: Response) => {
         startAt,
         endAt,
         location: { type: "Point", coordinates: [lng, lat] },
-        interest: hasInterest ? (payload.interest?.trim() ?? null) : null,
+        interest: hasInterest ? interestText : null,
+        interestEmbedding,
         module: moduleData ?? null
     })
 
