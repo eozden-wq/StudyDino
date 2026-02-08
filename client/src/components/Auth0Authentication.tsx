@@ -47,7 +47,7 @@ export function Auth0Authentication({ children }: Auth0AuthenticationProps) {
       {children}
     </>
   ) : (
-    <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-background space-y-4">
+    <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-background space-y-4 text-center">
       <h1 className="text-4xl font-bold text-primary">Welcome to StudyDino</h1>
       <p className="text-lg text-muted-foreground">Please log in or sign up to continue.</p>
       <div className="flex space-x-4">
